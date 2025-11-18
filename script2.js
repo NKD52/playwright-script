@@ -5,7 +5,7 @@ export default async function runAutomation(co, oId) {
 
   const HR_USERNAME = process.env.HR_USERNAME;
   const HR_PASSWORD = process.env.HR_PASSWORD;
-  const SECURITY_ANSWER = process.env.SECURITY_ANSWER || "Rehan";
+  const SECURITY_ANSWER = process.env.SECURITY_ANSWER;
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -37,10 +37,7 @@ export default async function runAutomation(co, oId) {
       await page.waitForTimeout(2000);
     }
 
-    await page.goto(targetUrl, { waitUntil: "networkidle" });
-
-    // Example: click the target button
-    // await page.click('button#yourButtonSelector');
+    await page.goto(targetUrl, { waitUntil: "networkidle" }); // Example: click the target button // await page.click('button#yourButtonSelector');
 
     await browser.close();
 
