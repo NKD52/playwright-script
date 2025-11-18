@@ -3,7 +3,7 @@ FROM node:20-slim
 
 # Install system dependencies required by Playwright (Chromium/Webkit/Firefox)
 # This includes the general dependencies plus the specific missing libraries from your error log:
-# libgtk-4-1, libgraphene-1.0-0, libsecret-1-0, libmanette-0.2-0, libenchant-2-2, libgles2, and gstreamer components.
+# libgtk-4-1, libgraphene-1.0-0, libsecret-1-0, libmanette-0.2-0, libenchant-2-2, libgles2, and gstreamer component
 RUN apt-get update && apt-get install -y \
     libgtk-4-1 \
     libgraphene-1.0-0 \
