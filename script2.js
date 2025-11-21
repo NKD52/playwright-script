@@ -1,4 +1,9 @@
+// script2.js (or wherever this lives)
 import { chromium } from "playwright";
+import fs from "fs";
+import path from "path";
+
+const AUTH_FILE = path.resolve("./auth.json"); // reuse same auth.json path
 
 export default async function runAutomation(
   co,
@@ -14,7 +19,17 @@ export default async function runAutomation(
   const SECURITY_ANSWER = process.env.SECURITY_ANSWER;
 
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+
+  // 🔹 Create context, loading auth.json if present
+  let context;
+  if (fs.existsSync(AUTH_FILE)) {
+    console.log("🔄 Using saved auth state from auth.json");
+    context = await browser.newContext({ storageState: AUTH_FILE });
+  } else {
+    console.log("🆕 No auth.json found, starting fresh context");
+    context = await browser.newContext();
+  }
+
   const page = await context.newPage();
 
   const targetUrl = `https://www.hralliance.net/onboard/ValidateI9.aspx?co=${co}&oid=${oId}`;
@@ -23,7 +38,7 @@ export default async function runAutomation(
     // --- INITIAL LOAD ---
     await page.goto(targetUrl, { waitUntil: "networkidle" });
 
-    const pageContent = (await page.textContent("body")) || "";
+    let pageContent = (await page.textContent("body")) || "";
 
     // --- LOGIN REQUIRED ---
     if (
@@ -31,6 +46,8 @@ export default async function runAutomation(
         "You are not allowed to view the page that you requested."
       )
     ) {
+      console.log("⚠️ Login required (or cookies invalid) – logging in…");
+
       await page.goto("https://www.hralliance.net/Dashboard2.aspx", {
         waitUntil: "networkidle",
       });
@@ -40,16 +57,30 @@ export default async function runAutomation(
       await page.click("#submit");
 
       await page.waitForLoadState("networkidle");
+      console.log("🔐 Login complete");
+
+      // update page content after login
+      pageContent = (await page.textContent("body")) || "";
+
+      // 🔸 Save fresh storage state after login
+      await context.storageState({ path: AUTH_FILE });
+      console.log("💾 Saved new auth state to auth.json");
     }
 
     // --- SECURITY QUESTION PAGE ---
     if (page.url().includes("UserActionRequiredNewDesign.aspx")) {
+      console.log("🔒 Security question page detected");
       await page.fill("#ans", SECURITY_ANSWER);
       await page.click("button.nv-btn-primary");
       await page.waitForTimeout(2000);
+
+      // 🔸 Save storage again after passing security
+      await context.storageState({ path: AUTH_FILE });
+      console.log("💾 Saved auth.json after security question");
     }
 
     // Reload target page now that we are authenticated
+    console.log("↩️ Reloading I-9 page:", targetUrl);
     await page.goto(targetUrl, { waitUntil: "networkidle" });
 
     //
@@ -57,15 +88,16 @@ export default async function runAutomation(
     // 1) CLICK "BEGIN E-VERIFY CASE"
     // -----------------------------------------------------------
     //
+    console.log('🟦 Waiting for "Begin E-Verify Case" button…');
     await page.waitForSelector('button:has-text("Begin E-Verify Case")', {
       timeout: 15000,
     });
     await page.click('button:has-text("Begin E-Verify Case")');
+    console.log("👉 Clicked Begin E-Verify");
 
     //
     // -----------------------------------------------------------
     // 2) WAIT FOR THE POPUP DIALOG
-    // The dialog title is: "Submit Initial E-Verify Case"
     // -----------------------------------------------------------
     //
     await page.waitForSelector(
@@ -74,16 +106,17 @@ export default async function runAutomation(
         timeout: 15000,
       }
     );
+    console.log("🟩 E-Verify dialog visible");
 
     //
     // -----------------------------------------------------------
     // 3) FILL FIELDS INSIDE DIALOG
     // -----------------------------------------------------------
     //
-
     await page.fill("#case_creator_name", creatorName);
     await page.fill("#case_creator_email_address", creatorEmail);
     await page.fill("#case_creator_phone_number", creatorPhone);
+    console.log("✏️ Filled creator info");
 
     //
     // -----------------------------------------------------------
@@ -91,8 +124,9 @@ export default async function runAutomation(
     // -----------------------------------------------------------
     //
     await page.click('.ui-dialog-buttonset button:has-text("Submit")');
+    console.log("📤 Submitted E-Verify case");
 
-    // (Optional) wait for the submit request/response to finish
+    // (Optional) wait a bit after submit
     await page.waitForTimeout(2000);
 
     await browser.close();
@@ -104,6 +138,7 @@ export default async function runAutomation(
       message: "E-Verify case submitted successfully",
     };
   } catch (err) {
+    console.error("❌ Automation error:", err);
     await browser.close();
     return { success: false, co, oId, message: err.message };
   }

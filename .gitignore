@@ -1,2 +1,9 @@
 .env
 node_modules
+auth.json
+user-data/
+types/
+api/
+test-local.js
+user-data-dir/
+user-data-dir-*
