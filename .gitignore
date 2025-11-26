@@ -6,4 +6,4 @@ types/
 api/
 test-local.js
 user-data-dir/
-user-data-dir-*
+

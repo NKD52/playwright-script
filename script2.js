@@ -126,16 +126,59 @@ export default async function runAutomation(
     await page.click('.ui-dialog-buttonset button:has-text("Submit")');
     console.log("📤 Submitted E-Verify case");
 
-    // (Optional) wait a bit after submit
+    // Wait after submitting
     await page.waitForTimeout(2000);
 
+    console.log("🔄 Refreshing page to check E-Verify result…");
+    await page.goto(targetUrl, { waitUntil: "networkidle" });
+
+    // Extract page text
+    const bodyText = (await page.textContent("body")) || "";
+
+    // The success indicator text (partial match is enough)
+    const successText =
+      "E-Verify is not required at this time for the following reason";
+
+    // -----------------------------------------------------------
+    // CHECK FOR SUCCESS MESSAGE
+    // -----------------------------------------------------------
+    if (bodyText.includes(successText)) {
+      console.log(
+        "E-Verify was already completed for this I9. No new case needed."
+      );
+
+      await browser.close();
+      return {
+        success: true,
+        co,
+        oId,
+        message:
+          "E-Verify completed previously. Message detected: E-Verify is not required.",
+      };
+    }
+
+    // -----------------------------------------------------------
+    // ANY OTHER MESSAGE = CAPTURE AND RETURN
+    // -----------------------------------------------------------
+    console.log("⚠️ Different message detected. Returning page snippet…");
+
+    // Extract the visible DIV element by ID
+    let messageHtml = "";
+    try {
+      const el = await page.$("#evCaseDisplay");
+      if (el) messageHtml = await el.innerHTML();
+    } catch {}
+
+    // Close browser
     await browser.close();
 
     return {
-      success: true,
+      success: false,
       co,
       oId,
-      message: "E-Verify case submitted successfully",
+      message:
+        "Unexpected E-Verify page message. Check 'details' field for actual message.",
+      details: messageHtml || bodyText.slice(0, 500),
     };
   } catch (err) {
     console.error("❌ Automation error:", err);
