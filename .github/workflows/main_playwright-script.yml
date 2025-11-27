@@ -33,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: playwright-td
+          path: playwright-script
 
   deploy:
     runs-on: ubuntu-latest
@@ -64,5 +64,6 @@ jobs:
           package: .
 
           
+
 
 
